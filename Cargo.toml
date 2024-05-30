@@ -1,0 +1,11 @@
+[package]
+name = "ephemerole"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+tokio = { version = "1", features = ["rt-multi-thread", "macros", "signal"] } # Maintained by multiple large companies
+# Twilight is an open-source project with a long history. https://github.com/twilight-rs/twilight
+twilight-gateway = "0.16.0-rc.1"
+twilight-model = "0.16.0-rc.1"
+twilight-http = "0.16.0-rc.1"
