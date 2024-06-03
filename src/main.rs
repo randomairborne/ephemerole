@@ -198,7 +198,9 @@ struct AppState {
 /// A custom error kind to allow for convenience in the update_users function
 #[derive(Debug)]
 pub enum Error {
+    /// A reader-writer lock or a mutex was poisoned. Dang it. Probably means we crash.
     LockPoison,
+    /// The discord api gave us an error. Report it.x
     DiscordApi(twilight_http::Error),
 }
 
