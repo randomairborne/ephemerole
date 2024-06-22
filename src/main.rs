@@ -156,7 +156,7 @@ async fn update_users(message_create: MessageCreate, state: AppState) -> Result<
                     // We don't need to know about this user anymore. Forget about them.
                     entry.remove();
                 } else {
-                    // Get a changable version of their stored data
+                    // Get a changeable version of their stored data
                     let entry = entry.into_mut();
                     // Set when the message was sent as the last message from this user
                     entry.last_message = message_sent_at;
