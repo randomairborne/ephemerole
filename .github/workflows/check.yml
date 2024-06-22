@@ -1,0 +1,29 @@
+name: Check build
+on:
+  pull_request:
+  workflow_dispatch:
+  workflow_call:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+
+      - name: Cache Packages
+        uses: Swatinem/rust-cache@v2
+        with:
+          key: "check"
+
+      - name: Check formatting
+        run: cargo fmt --check
+
+      - name: Check build
+        run: cargo clippy
+
+      - name: Run tests
+        run: cargo test
