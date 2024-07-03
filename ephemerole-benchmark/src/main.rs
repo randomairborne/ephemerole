@@ -1,7 +1,4 @@
-use std::{
-    sync::{atomic::AtomicBool, Arc},
-    time::Duration,
-};
+use std::sync::{atomic::AtomicBool, Arc};
 
 use ephemerole::{AppState, MessageMap};
 use tokio::{task::JoinSet, time::Instant};
