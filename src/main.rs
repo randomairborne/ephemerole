@@ -1,51 +1,24 @@
 use std::{
-    collections::{hash_map::Entry, HashMap},
+    collections::HashMap,
     str::FromStr,
     sync::{
         atomic::{AtomicBool, Ordering},
         Arc,
     },
-    time::{Duration, Instant},
 };
 
+use ephemerole::{AppState, MessageMap};
 use tokio::task::JoinSet;
 use twilight_gateway::{EventTypeFlags, Shard, StreamExt};
-use twilight_http::{request::AuditLogReason, Client};
+use twilight_http::Client;
 use twilight_model::{
-    gateway::{event::Event, payload::incoming::MessageCreate, CloseFrame, Intents, ShardId},
+    gateway::{CloseFrame, Intents, ShardId},
     id::{
-        marker::{GuildMarker, RoleMarker, UserMarker},
+        marker::{GuildMarker, RoleMarker},
         Id,
     },
 };
 
-/// Keep our temporary information about specific users all in one place
-struct UserData {
-    /// How many messages did this user send
-    messages: u64,
-    /// Instant is opaque. It's only usable from the memory
-    /// within this program.
-    last_message: Instant,
-}
-
-/// This holds the configuration data for the bot, plus the client for telling
-/// discord to do something.
-#[derive(Clone)]
-struct AppState {
-    guild: Id<GuildMarker>,
-    role: Id<RoleMarker>,
-    client: Arc<Client>,
-}
-
-/// This is a type alias. It is a map of user ID to user data
-type MessageMap = HashMap<Id<UserMarker>, UserData>;
-
-// How long users must wait before getting more credit
-const COOLDOWN: Duration = Duration::from_secs(60);
-// How much credit users must get before getting the role
-const MESSAGE_COUNT: u64 = 60;
-
-// tokio::main starts the background task manager
 #[tokio::main]
 async fn main() {
     // Read in our discord bot token, the server we're working in (discord calls them guilds behind the scenes)
@@ -81,7 +54,7 @@ async fn main() {
     });
 
     // Create a map of users -> current message counts and last message sent time
-    let mut message_map: MessageMap = HashMap::new();
+    let mut message_map = MessageMap::new();
 
     // Store the target server and role, plus the map of user messages, and the discord
     // notifier all together
@@ -97,119 +70,26 @@ async fn main() {
     // We only care about new messages
     let event_types = EventTypeFlags::MESSAGE_CREATE;
     // while there are more messages, process them
-    while let Some(msg) = shard.next_event(event_types).await {
+    while let Some(event) = shard.next_event(event_types).await {
         // Failing to receive one message is okay. Log it and go on to the next one.
-        let msg = match msg {
+        let event = match event {
             Ok(event) => event,
             Err(error) => {
                 eprintln!("ERROR: Failed to receive event: {error:?}");
                 continue;
             }
         };
-        match msg {
-            // Process a message
-            Event::MessageCreate(mc) => {
-                let target_id = mc.author.id;
-                // If we should add the role, spawn a background task to add the role
-                if should_assign_role(*mc, &state, &mut message_map) {
-                    let client = state.client.clone();
-                    background_tasks.spawn(add_role(client, state.guild, state.role, target_id));
-                }
-            }
-            Event::GatewayClose(_) => {
-                // The bot automatically reconnects to discord when
-                // improperly disconnected, so we check if we meant to shut down
-                // then exit the loop if we did
-                if shutdown.load(Ordering::Acquire) {
-                    break;
-                }
-            }
-            // Ignore events that aren't new messages or shutdowns
-            _ => {}
-        }
-    }
-}
-
-/// Add a role to a specific user, reporting the error in the console
-async fn add_role(
-    client: Arc<Client>,
-    guild: Id<GuildMarker>,
-    role: Id<RoleMarker>,
-    target: Id<UserMarker>,
-) {
-    // Attempt to add the user's role, reporting the error if we can't
-    if let Err(error) = client
-        .add_guild_member_role(guild, target, role)
-        .reason("User hit required message count")
+        // Calls the handle_event function in lib.rs
+        if ephemerole::handle_event(
+            event,
+            &state,
+            &mut message_map,
+            &mut background_tasks,
+            shutdown.as_ref(),
+        )
         .await
-    {
-        eprintln!("ERROR: could not calculate user's message count: {error:?}")
-    }
-}
-
-/// Determine if the sender of a message should get a role, and track their progress
-fn should_assign_role(
-    message_create: MessageCreate,
-    state: &AppState,
-    message_map: &mut MessageMap,
-) -> bool {
-    // If we know the user's roles, and we know they contain the role we'd assign
-    // ignore them
-    if message_create
-        .member
-        .as_ref()
-        .is_some_and(|v| v.roles.contains(&state.role))
-    {
-        return false;
-    }
-
-    // give the user ID a shorter name
-    let user_id = message_create.author.id;
-
-    // We got the message at this instant, so we assume that now is Close Enough to when
-    // the message was sent.
-    let message_sent_at = Instant::now();
-
-    // This looks at the current state the user is in, if it exists. If it doesn't have a state
-    // for that user, it adds one. Otherwise, we look and see if they're on cooldown and if they'd
-    // sent enough messages. Had they sent enough messages, we return `true`, which
-    // sets the return value of this function to true, as it is the last expression in the function,
-    // and it does not have a semicolon at the end.
-    match message_map.entry(user_id) {
-        Entry::Occupied(entry) => {
-            // We only do stuff to users if there has been at least COOLDOWN seconds since their last message.
-            // Saturating means that if the value is too big (which it can't really be in this code), just make it as big as possible.
-            if message_sent_at.saturating_duration_since(entry.get().last_message) > COOLDOWN {
-                // Have they sent enough messages? Find out today!
-                if entry.get().messages >= MESSAGE_COUNT {
-                    // We don't need to know about this user anymore. Forget about them.
-                    entry.remove();
-                    // They've sent enough messages! let the code later know that we need
-                    // to give them a role
-                    true
-                } else {
-                    // Get a changeable version of their stored data
-                    let entry = entry.into_mut();
-                    // Set when the message was sent as the last message from this user
-                    entry.last_message = message_sent_at;
-                    // Increase the number of messages this user has been known to send
-                    entry.messages += 1;
-                    // The user hasn't sent enough messages, don't give them a rule
-                    false
-                }
-            } else {
-                // The user is on cooldown, don't give them a role
-                false
-            }
-        }
-        // if we've never seen this user, add that they've sent one message as of right now
-        Entry::Vacant(entry) => {
-            entry.insert(UserData {
-                messages: 1,
-                last_message: message_sent_at,
-            });
-            // The user has only sent one message; why would we give them a role?
-            false
+        {
+            break;
         }
     }
 }

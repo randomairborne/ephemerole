@@ -1,5 +1,5 @@
 [package]
-name = "ephemerole"
+name = "ephemerole-benchmark"
 version = "0.1.0"
 edition = "2021"
 
@@ -10,8 +10,7 @@ tokio = { version = "1", features = ["rt-multi-thread", "macros", "signal"] }
 twilight-gateway = "0.16.0-rc.1"
 twilight-model = "0.16.0-rc.1"
 twilight-http = "0.16.0-rc.1"
-
-[workspace]
-members = [
-    "ephemerole-benchmark"
-]
+# serde_json is maintained by David Tolnay, a Rust project member
+serde_json = "1"
+# ephemerole is the main package
+ephemerole = { path = "../" }
