@@ -4,7 +4,6 @@ use std::{
         atomic::{AtomicBool, Ordering},
         Arc,
     },
-    time::{Duration, Instant},
 };
 
 use tokio::task::JoinSet;
@@ -21,9 +20,8 @@ use twilight_model::{
 pub struct UserData {
     /// How many messages did this user send
     messages: u64,
-    /// Instant is opaque. It's only usable from the memory
-    /// within this program.
-    last_message: Instant,
+    /// When was the last message at?
+    last_message_at: i64,
 }
 
 /// This holds the configuration data for the bot, plus the client for telling
@@ -39,7 +37,7 @@ pub struct AppState {
 pub type MessageMap = HashMap<Id<UserMarker>, UserData>;
 
 // How long users must wait before getting more credit
-const COOLDOWN: Duration = Duration::from_secs(60);
+const COOLDOWN_SECS: i64 = 60;
 // How much credit users must get before getting the role
 const MESSAGE_COUNT: u64 = 60;
 
@@ -110,9 +108,8 @@ fn should_assign_role(
     // give the user ID a shorter name
     let user_id = message_create.author.id;
 
-    // We got the message at this instant, so we assume that now is Close Enough to when
-    // the message was sent.
-    let message_sent_at = Instant::now();
+    // When was the message created
+    let message_sent_at = message_create.timestamp.as_secs();
 
     // This looks at the current state the user is in, if it exists. If it doesn't have a state
     // for that user, it adds one. Otherwise, we look and see if they're on cooldown and if they'd
@@ -122,8 +119,8 @@ fn should_assign_role(
     match message_map.entry(user_id) {
         Entry::Occupied(entry) => {
             // We only do stuff to users if there has been at least COOLDOWN seconds since their last message.
-            // Saturating means that if the value is too big (which it can't really be in this code), just make it as big as possible.
-            if message_sent_at.saturating_duration_since(entry.get().last_message) > COOLDOWN {
+            // Saturating means that if the value is too small (which it can't really be in this code), just make it as big as possible.
+            if message_sent_at.saturating_sub(entry.get().last_message_at) >= COOLDOWN_SECS {
                 // Have they sent enough messages? Find out today!
                 if entry.get().messages >= MESSAGE_COUNT {
                     // We don't need to know about this user anymore. Forget about them.
@@ -135,7 +132,7 @@ fn should_assign_role(
                     // Get a changeable version of their stored data
                     let entry = entry.into_mut();
                     // Set when the message was sent as the last message from this user
-                    entry.last_message = message_sent_at;
+                    entry.last_message_at = message_sent_at;
                     // Increase the number of messages this user has been known to send
                     entry.messages += 1;
                     // The user hasn't sent enough messages, don't give them a rule
@@ -150,7 +147,7 @@ fn should_assign_role(
         Entry::Vacant(entry) => {
             entry.insert(UserData {
                 messages: 1,
-                last_message: message_sent_at,
+                last_message_at: message_sent_at,
             });
             // The user has only sent one message; why would we give them a role?
             false

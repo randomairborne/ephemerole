@@ -16,7 +16,6 @@ use twilight_model::{
 
 #[tokio::main]
 async fn main() {
-    let mut total = Duration::from_secs(0);
     let message_count = 1_000_000_000;
     let started = Instant::now();
     let state = AppState {
@@ -26,7 +25,7 @@ async fn main() {
     };
     let mut tasks = JoinSet::new();
     let mut messages = MessageMap::new();
-    for i in (1..100_000).cycle().take(message_count) {
+    for (seq, i) in (1..100_000).cycle().take(message_count).enumerate() {
         let author = User {
             accent_color: None,
             avatar: None,
@@ -73,13 +72,12 @@ async fn main() {
             referenced_message: None,
             role_subscription_data: None,
             sticker_items: vec![],
-            timestamp: Timestamp::from_secs(1).unwrap(),
+            timestamp: Timestamp::from_secs(seq.try_into().unwrap()).unwrap(),
             thread: None,
             tts: false,
             webhook_id: None,
         };
         // let serialized = serde_json::to_string(&msg).unwrap();
-        let start = Instant::now();
         // let msg = serde_json::from_str(&serialized).unwrap();
         let msg = MessageCreate(msg);
         let event = Event::MessageCreate(Box::new(msg));
@@ -91,11 +89,11 @@ async fn main() {
             &AtomicBool::new(false),
         )
         .await;
-        total += start.elapsed();
     }
+    let elapsed = started.elapsed();
     println!(
-        "Took {} ({} including bench serializer) seconds to process 1,000,000,000 messages from 100,000 users (single thread)",
-        total.as_secs_f64(), started.elapsed().as_secs_f64()
+        "Took {} seconds to process 1,000,000,000 messages from 100,000 users (single thread)",
+        elapsed.as_secs_f64()
     );
-    println!("{} ns/iter", total.as_nanos() / message_count as u128);
+    println!("{} ns/iter", elapsed.as_nanos() / message_count as u128);
 }
