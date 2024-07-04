@@ -84,6 +84,7 @@ async fn main() {
             &mut messages,
             &mut tasks,
             &AtomicBool::new(false),
+            true,
         )
         .await;
     }

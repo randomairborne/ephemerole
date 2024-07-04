@@ -85,6 +85,7 @@ async fn main() {
             &mut message_map,
             &mut background_tasks,
             shutdown.as_ref(),
+            false,
         )
         .await
         {

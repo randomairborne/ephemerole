@@ -47,13 +47,14 @@ pub async fn handle_event(
     message_map: &mut MessageMap,
     background_tasks: &mut JoinSet<()>,
     shutdown: &AtomicBool,
+    dry_run: bool,
 ) -> bool {
     match event {
         // Process a message
         Event::MessageCreate(mc) => {
             let target_id = mc.author.id;
             // If we should add the role, spawn a background task to add the role
-            if should_assign_role(*mc, state, message_map) {
+            if should_assign_role(*mc, state, message_map) && !dry_run {
                 let client = state.client.clone();
                 background_tasks.spawn(add_role(client, state.guild, state.role, target_id));
             }
