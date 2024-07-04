@@ -90,8 +90,8 @@ async fn main() {
     }
     let elapsed = started.elapsed();
     println!(
-        "Took {} seconds to process 1,000,000,000 messages from 100,000 users (single thread)",
-        elapsed.as_secs_f64()
+        "Took {} seconds to process 1,000,000,000 messages from 100,000 users ({} ns/iter)",
+        elapsed.as_secs_f64(),
+        elapsed.as_nanos() / message_count as u128
     );
-    println!("{} ns/iter", elapsed.as_nanos() / message_count as u128);
 }
