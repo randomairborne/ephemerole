@@ -21,7 +21,7 @@ pub struct UserData {
     /// How many messages did this user send
     messages: u64,
     /// When was the last message at?
-    last_message_at: i64,
+    last_message_at: u64,
 }
 
 /// This holds the configuration data for the bot, plus the client for telling
@@ -37,7 +37,7 @@ pub struct AppState {
 pub type MessageMap = HashMap<Id<UserMarker>, UserData>;
 
 // How long users must wait before getting more credit
-const COOLDOWN_SECS: i64 = 60;
+const COOLDOWN_SECS: u64 = 60;
 // How much credit users must get before getting the role
 const MESSAGE_COUNT: u64 = 60;
 
@@ -90,6 +90,11 @@ async fn add_role(
     }
 }
 
+// Convert a discord message ID to a seconds value of when it was sent relative to the discord epoch
+fn snowflake_to_timestamp<T>(id: Id<T>) -> u64 {
+    (id.get() >> 22) / 1000
+}
+
 /// Determine if the sender of a message should get a role, and track their progress
 fn should_assign_role(
     message_create: MessageCreate,
@@ -110,7 +115,7 @@ fn should_assign_role(
     let user_id = message_create.author.id;
 
     // When was the message created
-    let message_sent_at = message_create.timestamp.as_secs();
+    let message_sent_at = snowflake_to_timestamp(message_create.id);
 
     // This looks at the current state the user is in, if it exists. If it doesn't have a state
     // for that user, it adds one. Otherwise, we look and see if they're on cooldown and if they'd
