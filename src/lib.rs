@@ -1,11 +1,12 @@
 use std::{
-    collections::{hash_map::Entry, HashMap},
+    collections::hash_map::Entry,
     sync::{
         atomic::{AtomicBool, Ordering},
         Arc,
     },
 };
 
+use ahash::AHashMap;
 use tokio::task::JoinSet;
 use twilight_http::{request::AuditLogReason, Client};
 use twilight_model::{
@@ -34,7 +35,7 @@ pub struct AppState {
 }
 
 /// This is a type alias. It is a map of user ID to user data
-pub type MessageMap = HashMap<Id<UserMarker>, UserData>;
+pub type MessageMap = AHashMap<Id<UserMarker>, UserData>;
 
 // How long users must wait before getting more credit
 const COOLDOWN_SECS: u64 = 60;

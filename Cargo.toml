@@ -10,6 +10,8 @@ tokio = { version = "1", features = ["rt-multi-thread", "macros", "signal"] }
 twilight-gateway = "0.16.0-rc.1"
 twilight-model = "0.16.0-rc.1"
 twilight-http = "0.16.0-rc.1"
+# ahash is a well-known rust library for a faster HashMap
+ahash = "0.8"
 
 [workspace]
 members = [
