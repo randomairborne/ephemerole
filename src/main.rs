@@ -18,7 +18,7 @@ use twilight_model::{
     },
 };
 
-#[tokio::main]
+#[tokio::main(flavor = "multi_thread", worker_threads = 2)]
 async fn main() {
     // Read in our discord bot token, the server we're working in (discord calls them guilds behind the scenes)
     // and the role we need to assign
