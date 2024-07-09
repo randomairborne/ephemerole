@@ -7,7 +7,7 @@ use std::{
 };
 
 use ahash::AHashMap;
-use tokio::task::JoinSet;
+use tokio::{runtime::Handle, task::JoinSet};
 use twilight_http::{request::AuditLogReason, Client};
 use twilight_model::{
     gateway::{event::Event, payload::incoming::MessageCreate},
@@ -47,6 +47,7 @@ pub async fn handle_event(
     state: &AppState,
     message_map: &mut MessageMap,
     background_tasks: &mut JoinSet<()>,
+    sender_rt: &Handle,
     shutdown: &AtomicBool,
 ) -> bool {
     match event {
@@ -56,7 +57,10 @@ pub async fn handle_event(
             // If we should add the role, spawn a background task to add the role
             if should_assign_role(*mc, state, message_map) {
                 let client = state.client.clone();
-                background_tasks.spawn(add_role(client, state.guild, state.role, target_id));
+                background_tasks.spawn_on(
+                    add_role(client, state.guild, state.role, target_id),
+                    sender_rt,
+                );
             }
         }
         Event::GatewayClose(_) => {

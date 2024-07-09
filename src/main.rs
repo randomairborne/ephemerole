@@ -7,7 +7,7 @@ use std::{
 };
 
 use ephemerole::{AppState, MessageMap};
-use tokio::task::JoinSet;
+use tokio::{runtime::Builder as RuntimeBuilder, task::JoinSet};
 use twilight_gateway::{EventTypeFlags, Shard, StreamExt};
 use twilight_http::Client;
 use twilight_model::{
@@ -18,7 +18,7 @@ use twilight_model::{
     },
 };
 
-#[tokio::main(flavor = "multi_thread", worker_threads = 2)]
+#[tokio::main(flavor = "current_thread")]
 async fn main() {
     // Read in our discord bot token, the server we're working in (discord calls them guilds behind the scenes)
     // and the role we need to assign
@@ -40,16 +40,29 @@ async fn main() {
     // Makes a messenger to the shard, so we can tell it to stop
     let shutdown_sender = shard.sender();
 
-    // Start a background task
-    tokio::spawn(async move {
-        // Wait until we're told to stop
-        shutdown_signal().await;
-        // Set `shutdown` to true, ensuring that every time it is read in the future
-        // it will be true. If the store ordering was not Release, or the load ordering
-        // was not Acquire, this would be a lazy operation
-        shutdown_setter.store(true, Ordering::Release);
-        // Tell discord "hey, disconnect me"
-        shutdown_sender.close(CloseFrame::NORMAL).ok();
+    // Create a different runtime to do non-critical tasks on a different thread
+    let sender_rt = RuntimeBuilder::new_current_thread()
+        .enable_all()
+        .thread_name("role_adder")
+        .build()
+        .unwrap();
+    // Create a way to send new tasks to this runtime
+    let sender_rt_handle = sender_rt.handle().clone();
+
+    // start a background runtime to handle other I/O tasks, like adding roles
+    std::thread::spawn(move || {
+        // Provide something for the main thread of the background runtime to do
+        // it needs something to do, or we can't spawn on it.
+        sender_rt.block_on(async move {
+            // Wait until we're told to stop
+            shutdown_signal().await;
+            // Set `shutdown` to true, ensuring that every time it is read in the future
+            // it will be true. If the store ordering was not Release, or the load ordering
+            // was not Acquire, this would be a lazy operation
+            shutdown_setter.store(true, Ordering::Release);
+            // Tell discord "hey, disconnect me"
+            shutdown_sender.close(CloseFrame::NORMAL).ok();
+        });
     });
 
     // Create a map of users -> current message counts and last message sent time
@@ -84,6 +97,7 @@ async fn main() {
             &state,
             &mut message_map,
             &mut background_tasks,
+            &sender_rt_handle,
             shutdown.as_ref(),
         )
         .await
@@ -91,6 +105,8 @@ async fn main() {
             break;
         }
     }
+    // Wait for all background tasks to complete
+    while background_tasks.join_next().await.is_some() {}
 }
 
 // The bot uses "environment variables" for configuration.

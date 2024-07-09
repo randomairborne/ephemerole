@@ -5,7 +5,7 @@ edition = "2021"
 
 [dependencies]
 # tokio is maintained by multiple large companies
-tokio = { version = "1", features = ["rt-multi-thread", "macros", "signal"] }
+tokio = { version = "1", features = ["rt", "macros", "signal"] }
 # twilight is an open-source project with a long history. https://github.com/twilight-rs/twilight
 twilight-gateway = "0.16.0-rc.1"
 twilight-model = "0.16.0-rc.1"
