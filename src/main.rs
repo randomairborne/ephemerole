@@ -100,7 +100,7 @@ async fn main() {
             &sender_rt_handle,
             shutdown.as_ref(),
         )
-            .await
+        .await
         {
             // if the event is a close, we can stop listening for new ones
             break;
