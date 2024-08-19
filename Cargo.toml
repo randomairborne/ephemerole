@@ -2,6 +2,11 @@
 name = "ephemerole"
 version = "0.1.0"
 edition = "2021"
+description = "A simple discord bot to track user activity"
+license = "MIT OR Apache-2.0"
+repository = "https://github.com/randomairborne/ephemerole"
+keywords = ["discord", "discord-bot"]
+categories = ["games"]
 
 [dependencies]
 # tokio is maintained by multiple large companies

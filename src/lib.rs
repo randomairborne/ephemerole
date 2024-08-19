@@ -1,3 +1,5 @@
+#![warn(clippy::all, clippy::pedantic, clippy::nursery)]
+
 use std::{
     collections::hash_map::Entry,
     sync::{
@@ -39,7 +41,7 @@ pub struct AppState {
 /// This is a type alias. It is a map of user ID to user data
 pub type MessageMap = AHashMap<Id<UserMarker>, UserData>;
 
-pub async fn handle_event(
+pub fn handle_event(
     event: Event,
     state: &AppState,
     message_map: &mut MessageMap,
@@ -52,7 +54,7 @@ pub async fn handle_event(
         Event::MessageCreate(mc) => {
             let target_id = mc.author.id;
             // If we should add the role, spawn a background task to add the role
-            if should_assign_role(*mc, state, message_map) {
+            if should_assign_role(&mc, state, message_map) {
                 let client = state.client.clone();
                 background_tasks.spawn_on(
                     add_role(client, state.guild, state.role, target_id),
@@ -87,18 +89,18 @@ async fn add_role(
         .reason("User hit required message count")
         .await
     {
-        eprintln!("ERROR: could not calculate user's message count: {error:?}")
+        eprintln!("ERROR: could not calculate user's message count: {error:?}");
     }
 }
 
 // Convert a discord message ID to a seconds value of when it was sent relative to the discord epoch
-fn snowflake_to_timestamp<T>(id: Id<T>) -> u64 {
+const fn snowflake_to_timestamp<T>(id: Id<T>) -> u64 {
     (id.get() >> 22) / 1000
 }
 
 /// Determine if the sender of a message should get a role, and track their progress
 pub fn should_assign_role(
-    message_create: MessageCreate,
+    message_create: &MessageCreate,
     state: &AppState,
     message_map: &mut MessageMap,
 ) -> bool {

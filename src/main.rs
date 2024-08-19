@@ -1,3 +1,4 @@
+#![warn(clippy::all, clippy::pedantic, clippy::nursery)]
 use std::{
     env::VarError,
     str::FromStr,
@@ -79,8 +80,8 @@ async fn main() {
         guild,
         role,
         client,
-        message_requirement,
         message_cooldown,
+        message_requirement,
     };
 
     // create a set of background tasks to handle new messages, so we don't
@@ -106,9 +107,7 @@ async fn main() {
             &mut background_tasks,
             &sender_rt_handle,
             shutdown.as_ref(),
-        )
-        .await
-        {
+        ) {
             // if the event is a close, we can stop listening for new ones
             break;
         }

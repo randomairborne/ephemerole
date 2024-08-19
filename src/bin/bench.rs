@@ -1,3 +1,5 @@
+#![warn(clippy::all, clippy::pedantic, clippy::nursery)]
+
 use std::{sync::Arc, time::Instant};
 
 use ephemerole::{AppState, MessageMap};
@@ -74,7 +76,7 @@ fn main() {
             webhook_id: None,
         };
         let msg = MessageCreate(msg);
-        std::hint::black_box(ephemerole::should_assign_role(msg, &state, &mut messages));
+        std::hint::black_box(ephemerole::should_assign_role(&msg, &state, &mut messages));
     }
     let elapsed = started.elapsed();
     println!(
