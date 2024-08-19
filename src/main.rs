@@ -1,4 +1,5 @@
 use std::{
+    env::VarError,
     str::FromStr,
     sync::{
         atomic::{AtomicBool, Ordering},
@@ -25,6 +26,10 @@ async fn main() {
     let token: String = parse_var("DISCORD_TOKEN");
     let guild: Id<GuildMarker> = parse_var("DISCORD_GUILD");
     let role: Id<RoleMarker> = parse_var("DISCORD_ROLE");
+
+    // These values are optional, and they both have default values of 60
+    let message_requirement: u64 = get_var("MESSAGE_REQUIREMENT").unwrap_or(60);
+    let message_cooldown: u64 = get_var("MESSAGE_COOLDOWN").unwrap_or(60);
 
     // We only care about new server messages, only have one bot instance, and don't care about message content
     let mut shard = Shard::new(ShardId::ONE, token.clone(), Intents::GUILD_MESSAGES);
@@ -74,6 +79,8 @@ async fn main() {
         guild,
         role,
         client,
+        message_requirement,
+        message_cooldown,
     };
 
     // create a set of background tasks to handle new messages, so we don't
@@ -110,13 +117,49 @@ async fn main() {
     while background_tasks.join_next().await.is_some() {}
 }
 
+// This function wraps parse_var_res to give human-readable fatal errors
+fn parse_var<T: FromStr>(name: &str) -> T {
+    match parse_var_res(name) {
+        Ok(v) => v,
+        Err(ParseVarError::Parse(_)) => {
+            panic!("Could not parse {name} as {}!", std::any::type_name::<T>())
+        }
+        Err(ParseVarError::Var(VarError::NotPresent)) => {
+            panic!("Could not find {name} in environment!")
+        }
+        Err(ParseVarError::Var(VarError::NotUnicode(_))) => {
+            panic!("{name} does not have a unicode value!")
+        }
+    }
+}
+
+// This function wraps parse_var_res to see if the value is invalid (and error if it is) or nonexistent (so we can default it)
+fn get_var<T: FromStr>(name: &str) -> Option<T> {
+    match parse_var_res(name) {
+        Ok(v) => Some(v),
+        Err(ParseVarError::Parse(_)) => {
+            panic!("Could not parse {name} as {}!", std::any::type_name::<T>())
+        }
+        Err(ParseVarError::Var(VarError::NotPresent)) => None,
+        Err(ParseVarError::Var(VarError::NotUnicode(_))) => {
+            panic!("{name} does not have a unicode value!")
+        }
+    }
+}
+
 // The bot uses "environment variables" for configuration.
 // This helps the bot pick one of them out and convert the value (which is always text) into a number.
-fn parse_var<T: FromStr>(name: &str) -> T {
-    std::env::var(name)
-        .unwrap_or_else(|_| panic!("Expected {name} in the environment!"))
-        .parse::<T>()
-        .unwrap_or_else(|_| panic!("Could not parse {name} as {}!", std::any::type_name::<T>()))
+fn parse_var_res<T: FromStr>(name: &str) -> Result<T, ParseVarError<T>> {
+    std::env::var(name) // get the variable
+        .map_err(ParseVarError::Var)? // if it doesn't exist, convert the error to a ParseVarError and bail out
+        .parse() // Try to turn it into the type we want
+        .map_err(ParseVarError::Parse) // If it can't be turned into that, wrap up the error and return it
+}
+
+/// The different types of errors we can get when we try to parse a variable
+enum ParseVarError<T: FromStr> {
+    Var(VarError),
+    Parse(<T as FromStr>::Err),
 }
 
 /// Windows and Linux supported code to return from this function when this app is told to shut down.

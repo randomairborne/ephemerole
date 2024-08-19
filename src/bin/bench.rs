@@ -17,6 +17,8 @@ fn main() {
         guild: Id::new(1),
         role: Id::new(1),
         client: Arc::new(Client::builder().build()),
+        message_cooldown: 60,
+        message_requirement: 60,
     };
     let mut messages = MessageMap::new();
     for (seq, i) in (1..100_000).cycle().take(message_count).enumerate() {

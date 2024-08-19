@@ -32,15 +32,12 @@ pub struct AppState {
     pub guild: Id<GuildMarker>,
     pub role: Id<RoleMarker>,
     pub client: Arc<Client>,
+    pub message_cooldown: u64,
+    pub message_requirement: u64,
 }
 
 /// This is a type alias. It is a map of user ID to user data
 pub type MessageMap = AHashMap<Id<UserMarker>, UserData>;
-
-// How long users must wait before getting more credit
-const COOLDOWN_SECS: u64 = 60;
-// How much credit users must get before getting the role
-const MESSAGE_COUNT: u64 = 60;
 
 pub async fn handle_event(
     event: Event,
@@ -128,11 +125,12 @@ pub fn should_assign_role(
     // and it does not have a semicolon at the end.
     match message_map.entry(user_id) {
         Entry::Occupied(entry) => {
-            // We only do stuff to users if there has been at least COOLDOWN seconds since their last message.
+            // We only do stuff to users if there has been at least message_cooldown seconds since their last message.
             // Saturating means that if the value is too small (which it can't really be in this code), just make it as big as possible.
-            if message_sent_at.saturating_sub(entry.get().last_message_at) >= COOLDOWN_SECS {
+            if message_sent_at.saturating_sub(entry.get().last_message_at) >= state.message_cooldown
+            {
                 // Have they sent enough messages? Find out today!
-                if entry.get().messages >= MESSAGE_COUNT {
+                if entry.get().messages >= state.message_requirement {
                     // We don't need to know about this user anymore. Forget about them.
                     entry.remove();
                     // They've sent enough messages! let the code later know that we need
