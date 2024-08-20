@@ -23,9 +23,9 @@ use twilight_model::{
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub struct UserData {
     /// How many messages did this user send
-    messages: u64,
+    pub messages: u64,
     /// When was the last message at?
-    last_message_at: u64,
+    pub last_message_at: u64,
 }
 
 /// This holds the configuration data for the bot, plus the client for telling
