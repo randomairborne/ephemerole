@@ -1,11 +1,13 @@
 #![warn(clippy::all, clippy::pedantic, clippy::nursery)]
 use std::{
     env::VarError,
+    path::{Path, PathBuf},
     str::FromStr,
     sync::{
         atomic::{AtomicBool, Ordering},
         Arc,
     },
+    time::Duration,
 };
 
 use ephemerole::{AppState, MessageMap};
@@ -20,6 +22,8 @@ use twilight_model::{
     },
 };
 
+mod persist;
+
 #[tokio::main(flavor = "current_thread")]
 async fn main() {
     // Read in our discord bot token, the server we're working in (discord calls them guilds behind the scenes)
@@ -31,6 +35,12 @@ async fn main() {
     // These values are optional, and they both have default values of 60
     let message_requirement: u64 = get_var("MESSAGE_REQUIREMENT").unwrap_or(60);
     let message_cooldown: u64 = get_var("MESSAGE_COOLDOWN").unwrap_or(60);
+
+    // This value is for the save interval. it is *optional*, if we don't get it, we don't save.
+    let save_interval: Option<u64> = get_var("SAVE_INTERVAL");
+
+    // Take an optional save file path
+    let save_path: Option<PathBuf> = get_var("SAVE_FILE");
 
     // We only care about new server messages, only have one bot instance, and don't care about message content
     let mut shard = Shard::new(ShardId::ONE, token.clone(), Intents::GUILD_MESSAGES);
@@ -72,7 +82,9 @@ async fn main() {
     });
 
     // Create a map of users -> current message counts and last message sent time
-    let mut message_map = MessageMap::new();
+    // load_from_file tries to load from the save file if it exists.
+    let mut message_map =
+        load_from_file(save_path.as_deref(), guild).expect("Failed to load save file");
 
     // Store the target server and role, plus the map of user messages, and the discord
     // notifier all together
@@ -89,8 +101,34 @@ async fn main() {
     let mut background_tasks = JoinSet::new();
     // We only care about new messages
     let event_types = EventTypeFlags::MESSAGE_CREATE;
+
+    let mut ticker = tokio::time::interval(Duration::from_secs(save_interval.unwrap_or(u64::MAX)));
+    // We don't need to re-save if nothing has changed, so every time something could have changed,
+    // we update new_event to true.
+    let mut new_event = false;
+
     // while there are more messages, process them
-    while let Some(event) = shard.next_event(event_types).await {
+    loop {
+        // select is a special function that means "Start doing something when the first one of these is ready"
+        #[allow(clippy::redundant_pub_crate)] // Spurious warning from the macro
+        let Some(event) = tokio::select!(
+            _ = ticker.tick() => {
+                if save_interval.is_some() && new_event { // if there is a configured save interval AND the data could have changed, then we will proceed
+                    let save_path = save_path.clone(); // we need a copy of the save path
+                    let message_map = message_map.clone(); // we also make a copy of the messages. this is pretty expensive.
+                    std::thread::spawn(move || save_to_file(save_path.as_deref(), guild, &message_map)); // spawn a background task to do the actual saving
+                    new_event = false; // We've processed the most recent event, no need to do a spurious resave
+                }
+                continue; // Wait for next event
+            },
+            v = shard.next_event(event_types) => { v }, // if we have a new event, return it
+        ) else {
+            break; // if there are no more events, end
+        };
+
+        // We got a new event, and will do something about it
+        new_event = true;
+
         // Failing to receive one message is okay. Log it and go on to the next one.
         let event = match event {
             Ok(event) => event,
@@ -114,6 +152,56 @@ async fn main() {
     }
     // Wait for all background tasks to complete
     while background_tasks.join_next().await.is_some() {}
+}
+
+fn save_to_file(path: Option<&Path>, id: Id<GuildMarker>, map: &MessageMap) {
+    let tmp_rand_id: u64 = rand::random(); // Generate a random name for our temporary file
+    let temp_path = std::env::temp_dir().join(format!("{tmp_rand_id}.epd")); // This is where our temp file actually goes
+    {
+        // Report a loud big error if we can't open the randomly chosen file
+        let mut file = std::fs::OpenOptions::new()
+            .write(true)
+            .create_new(true)
+            .open(&temp_path)
+            .expect("ERROR: Failed to open temp file");
+        // Write the save data
+        if let Err(err) = persist::save(map, &mut file) {
+            // Try our best to remove the temp file on error
+            std::fs::remove_file(temp_path).ok();
+            // Panic the saving thread
+            panic!("ERROR: Failed to save persistence data: {err:?}");
+        };
+    }
+    // Generate the "default path"
+    let id_path = PathBuf::new().join(format!("{id}.epd"));
+    // Move the file. This is an atomic operation, it either succeeds and overwrites or it fails and
+    // it leaves the previous file intact.
+    // This way we don't half-write-out our save super easily :p
+    std::fs::rename(temp_path, path.unwrap_or_else(|| id_path.as_ref()))
+        .expect("Failed to rename file");
+}
+
+fn load_from_file(path: Option<&Path>, id: Id<GuildMarker>) -> Result<MessageMap, std::io::Error> {
+    // The default file path is serverid.epd
+    let id_path = PathBuf::new().join(format!("{id}.epd"));
+    // if we weren't given a path, use the default one
+    let path = path.unwrap_or_else(|| id_path.as_ref());
+    // Does the file exist?
+    let mut file = match std::fs::OpenOptions::new().read(true).open(path) {
+        // File exists, continue to loading
+        Ok(v) => v,
+        // File could not be opened.
+        Err(e) => {
+            return match e.kind() {
+                // File doesn't exist, no save-data, return empty save
+                std::io::ErrorKind::NotFound => Ok(MessageMap::new()),
+                // Bubble up the error, there was some kind of other problem
+                _ => Err(e),
+            };
+        }
+    };
+    // Load the file data, returning the error if there is one
+    persist::load(&mut file)
 }
 
 // This function wraps parse_var_res to give human-readable fatal errors
