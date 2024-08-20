@@ -20,6 +20,7 @@ use twilight_model::{
 };
 
 /// Keep our temporary information about specific users all in one place
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub struct UserData {
     /// How many messages did this user send
     messages: u64,
