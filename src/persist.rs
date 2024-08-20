@@ -16,8 +16,7 @@ use std::{
 use ephemerole::{MessageMap, UserData};
 use twilight_model::id::Id;
 
-const MAGIC: u64 = 0x7f8f_58a6_b944_1e85; // A randomly chosen value that identifies .epd files
-const MAGIC_BYTES: [u8; 8] = MAGIC.to_le_bytes(); // Byte value of the MAGIC constant, for easier writing
+const MAGIC_BYTES: [u8; 8] = [0x85, 0x1e, 0x44, 0xb9, 0xa6, 0x58, 0x8f, 0x7f]; // Random bytes chosen to identify our custom filetype
 
 /// Saves a [`MessageMap`] to the I/O object provided.
 ///
@@ -64,21 +63,28 @@ pub fn save(map: &MessageMap, file: &mut impl std::io::Write) -> Result<(), IoEr
 }
 
 pub fn load(file: &mut impl std::io::Read) -> Result<MessageMap, IoError> {
-    let mut hash = Fnv1A::new();
+    let mut hash = Fnv1A::new(); // Create a new hash so we can compare them
     let mut messages = MessageMap::new();
+
+    // We need to make sure the first 8 bytes are the same, they are ALWAYS the same in ephemerole
+    // save files.
     {
-        let mut magic_buf = [0u8; 8];
+        let mut magic_buf = [0u8; 8]; // Length of our magic bytes
 
         file.read_exact(&mut magic_buf)?;
+        // if the magic bytes aren't the same as the ones we write into every file, this ain't
+        // an epd file, bail out with an error
         if magic_buf != MAGIC_BYTES {
             return Err(IoError::new(
                 IoErrorKind::InvalidData,
                 "Invalid magic for `.epd` file",
             ));
         }
+        // if it IS an epd file, it still might be corrupted, so hash the magic bytes
         hash.update_each(&MAGIC_BYTES);
     }
 
+    // Read and hash the length, then convert it to the actual length number
     let len = {
         let mut len_buf = [0u8; 8];
         file.read_exact(&mut len_buf)?;
@@ -86,6 +92,8 @@ pub fn load(file: &mut impl std::io::Read) -> Result<MessageMap, IoError> {
         u64::from_le_bytes(len_buf)
     };
 
+    // Performance optimization to automatically get the map ready for Many Many Entries.
+    // If we have too many entries for the map to contain, we bail out with an error.
     {
         let len_usize = len.try_into().map_err(|_| {
             IoError::new(
@@ -93,31 +101,40 @@ pub fn load(file: &mut impl std::io::Read) -> Result<MessageMap, IoError> {
                 "You have more then usize::MAX entries??? What??",
             )
         })?;
-        messages.reserve(len_usize);
+        messages.try_reserve(len_usize)?;
     }
 
+    // Read a user's data from the save file `len` times
     for _ in 0..len {
         let mut saveuser_buf = [0u8; 24];
         file.read_exact(&mut saveuser_buf)?;
         hash.update_each(&saveuser_buf);
 
+        // Get structured user data from the raw bytes
         let user = SaveUser::from_raw(saveuser_buf);
+
+        // convert the special SaveUser into the mapped data structure
         let user_data = UserData {
             messages: user.msgs,
             last_message_at: user.last_msg,
         };
+        // Make sure the user ID isn't 0, that can break things
         let user_id = Id::new_checked(user.id).ok_or_else(|| {
             IoError::new(
                 IoErrorKind::InvalidData,
                 "Invalid user ID value. Did you tamper with the save?",
             )
         })?;
+        // Add the user to the new map
         messages.insert(user_id, user_data);
     }
 
+    // Read out the hash data to a number
     let mut hash_buf = [0u8; 8];
     file.read_exact(&mut hash_buf)?;
     let provided_hash = u64::from_le_bytes(hash_buf);
+
+    // Get the calculated hash and bail if it's invalid
     let real_hash = hash.finish();
     if provided_hash != real_hash {
         return Err(IoError::new(ErrorKind::InvalidData, "Hashes do not match!"));
@@ -126,6 +143,7 @@ pub fn load(file: &mut impl std::io::Read) -> Result<MessageMap, IoError> {
     Ok(messages)
 }
 
+/// A special data structure to encapsulate the storage of each user.
 #[derive(Copy, Clone, Debug, Hash)]
 struct SaveUser {
     id: u64,
@@ -135,7 +153,9 @@ struct SaveUser {
 
 impl SaveUser {
     pub fn to_raw(self) -> [u8; 24] {
+        // the output section has this exact size for 3 of this type of number
         let mut out = [0; 24];
+        // Copy the ID, message count, and last message timestamp into the output data
         out[0..8].copy_from_slice(self.id.to_le_bytes().as_slice());
         out[8..16].copy_from_slice(self.msgs.to_le_bytes().as_slice());
         out[16..24].copy_from_slice(self.last_msg.to_le_bytes().as_slice());
@@ -144,6 +164,7 @@ impl SaveUser {
 
     pub fn from_raw(data: [u8; 24]) -> Self {
         // These unwraps are okay because we can see (but the compiler can't) that this is a perfect fit.
+        // We're taking the raw data and loading it back into numbers in the right order.
         let id = u64::from_le_bytes(data[0..8].try_into().unwrap());
         let msgs = u64::from_le_bytes(data[8..16].try_into().unwrap());
         let last_msg = u64::from_le_bytes(data[16..24].try_into().unwrap());
