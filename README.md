@@ -38,7 +38,7 @@ variables.
 ## Persistence configuration
 
 > [!WARNING]
-> ALL DATA IS WIPED ON RESTART UNLESS PERSISTENCE IS EXPLICITLY CONFIGURED
+> ALL DATA IS WIPED ON RESTART UNLESS PERSISTENCE IS EXPLICITLY CONFIGURED!
 
 Persistence supports two environment variables.
 
