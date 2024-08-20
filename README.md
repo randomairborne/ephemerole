@@ -19,7 +19,7 @@ x86. It takes just three environment variables:
 
 - `DISCORD_TOKEN`: The Discord app API key from the [developer dashboard](https://discord.com/developers/applications)
 - `DISCORD_GUILD`: The ID of the guild you wish to use the bot in
-- `DISCORD_ROLE`: The ID of the role you wish to grant after 60 minutes
+- `DISCORD_ROLE`: The ID of the role you wish to grant after `MESSAGE_REQUIREMENT` is met.
 
 Once you've set these up, probably using Docker Compose, start up the bot, and voilá! Users should be granted the role
 automatically.
