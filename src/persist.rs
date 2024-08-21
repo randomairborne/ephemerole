@@ -246,7 +246,10 @@ mod fnv_tests {
 
 #[cfg(test)]
 mod tests {
-    use std::{io::Cursor, ops::AddAssign};
+    use std::{
+        io::Cursor,
+        ops::{AddAssign, SubAssign},
+    };
 
     use ephemerole::MessageMap;
 
@@ -303,5 +306,33 @@ mod tests {
         save(&messages, &mut Cursor::new(&mut fake_file)).unwrap();
         fake_file.last_mut().unwrap().add_assign(1);
         load(&mut Cursor::new(&mut fake_file)).unwrap_err();
+    }
+
+    #[test]
+    fn len_too_big() {
+        let mut messages = MessageMap::new();
+        for i in 1..1241 {
+            messages.insert(Id::new(10), dummy_data(12 * i, 135 * i));
+        }
+        let mut fake_file = Vec::new();
+        save(&messages, &mut Cursor::new(&mut fake_file)).unwrap();
+        // Add one to the msb of the len
+        fake_file.iter_mut().nth(12).unwrap().add_assign(1);
+        let err = load(&mut Cursor::new(&mut fake_file)).unwrap_err();
+        assert_eq!(err.kind(), ErrorKind::UnexpectedEof);
+    }
+
+    #[test]
+    fn len_too_small() {
+        let mut messages = MessageMap::new();
+        for i in 1..1241 {
+            messages.insert(Id::new(10), dummy_data(12 * i, 135 * i));
+        }
+        let mut fake_file = Vec::new();
+        save(&messages, &mut Cursor::new(&mut fake_file)).unwrap();
+        // subtract one from the LSB of the length
+        fake_file.iter_mut().nth(8).unwrap().sub_assign(1);
+        let err = load(&mut Cursor::new(&mut fake_file)).unwrap_err();
+        assert_eq!(err.kind(), ErrorKind::InvalidData);
     }
 }
