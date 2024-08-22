@@ -246,7 +246,7 @@ mod fnv_tests {
 mod tests {
     use std::{
         io::Cursor,
-        ops::{AddAssign, SubAssign},
+        ops::{Add, AddAssign, Sub},
     };
 
     use ephemerole::MessageMap;
@@ -258,6 +258,11 @@ mod tests {
             messages,
             last_message_at,
         }
+    }
+
+    fn len_to_arr(item: usize) -> [u8; 8] {
+        let item: u64 = item.try_into().unwrap();
+        item.to_le_bytes()
     }
 
     #[test]
@@ -314,8 +319,11 @@ mod tests {
         }
         let mut fake_file = Vec::new();
         save(&messages, &mut Cursor::new(&mut fake_file)).unwrap();
-        // Add one to the of the len
-        fake_file[8..16].copy_from_slice(1242u64.to_le_bytes().as_slice());
+
+        // One more than the len
+        let wrong_len_arr = len_to_arr(messages.len().add(1));
+        fake_file[8..16].copy_from_slice(wrong_len_arr.as_slice());
+
         let err = load(&mut Cursor::new(&mut fake_file)).unwrap_err();
         assert_eq!(err.kind(), ErrorKind::UnexpectedEof);
     }
@@ -328,8 +336,11 @@ mod tests {
         }
         let mut fake_file = Vec::new();
         save(&messages, &mut Cursor::new(&mut fake_file)).unwrap();
-        // subtract one from the LSB of the length
-        fake_file.iter_mut().nth(8).unwrap().sub_assign(1);
+
+        // One less than the len
+        let wrong_len_arr = len_to_arr(messages.len().sub(1));
+        fake_file[8..16].copy_from_slice(wrong_len_arr.as_slice());
+
         let err = load(&mut Cursor::new(&mut fake_file)).unwrap_err();
         assert_eq!(err.kind(), ErrorKind::InvalidData);
     }
