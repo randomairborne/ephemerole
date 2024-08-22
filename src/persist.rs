@@ -316,8 +316,8 @@ mod tests {
         }
         let mut fake_file = Vec::new();
         save(&messages, &mut Cursor::new(&mut fake_file)).unwrap();
-        // Add one to the msb of the len
-        fake_file.iter_mut().nth(12).unwrap().add_assign(1);
+        // Add one to the of the len
+        fake_file[8..16].copy_from_slice(1242u64.to_le_bytes().as_slice());
         let err = load(&mut Cursor::new(&mut fake_file)).unwrap_err();
         assert_eq!(err.kind(), ErrorKind::UnexpectedEof);
     }
