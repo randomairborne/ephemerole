@@ -285,7 +285,7 @@ mod tests {
     fn many_items() {
         let mut messages = MessageMap::new();
         for i in 1..1241 {
-            messages.insert(Id::new(10), dummy_data(12 * i, 135 * i));
+            messages.insert(Id::new(10 * i), dummy_data(12 * i, 135 * i));
         }
         let mut fake_file = Vec::new();
         save(&messages, &mut Cursor::new(&mut fake_file)).unwrap();
@@ -298,7 +298,7 @@ mod tests {
     fn checksum_wrong() {
         let mut messages = MessageMap::new();
         for i in 1..1241 {
-            messages.insert(Id::new(10), dummy_data(12 * i, 135 * i));
+            messages.insert(Id::new(10 * i), dummy_data(12 * i, 135 * i));
         }
         let mut fake_file = Vec::new();
         save(&messages, &mut Cursor::new(&mut fake_file)).unwrap();
@@ -310,7 +310,7 @@ mod tests {
     fn len_too_big() {
         let mut messages = MessageMap::new();
         for i in 1..1241 {
-            messages.insert(Id::new(10), dummy_data(12 * i, 135 * i));
+            messages.insert(Id::new(10 * i), dummy_data(12 * i, 135 * i));
         }
         let mut fake_file = Vec::new();
         save(&messages, &mut Cursor::new(&mut fake_file)).unwrap();
@@ -324,7 +324,7 @@ mod tests {
     fn len_too_small() {
         let mut messages = MessageMap::new();
         for i in 1..1241 {
-            messages.insert(Id::new(10), dummy_data(12 * i, 135 * i));
+            messages.insert(Id::new(10 * i), dummy_data(12 * i, 135 * i));
         }
         let mut fake_file = Vec::new();
         save(&messages, &mut Cursor::new(&mut fake_file)).unwrap();
