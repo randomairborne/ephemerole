@@ -183,9 +183,7 @@ pub struct Fnv1A {
 impl Fnv1A {
     const FNV_PRIME: u64 = 1_099_511_628_211;
     const OFFSET_BASIS: u64 = 14_695_981_039_346_656_037;
-}
 
-impl Fnv1A {
     pub fn update(&mut self, data: u8) {
         self.hash = self
             .hash
