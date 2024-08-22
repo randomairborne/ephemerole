@@ -16,7 +16,7 @@ use std::{
 use ephemerole::{MessageMap, UserData};
 use twilight_model::id::Id;
 
-const MAGIC_BYTES: [u8; 8] = [0x85, 0x1e, 0x44, 0xb9, 0xa6, 0x58, 0x8f, 0x7f]; // Random bytes chosen to identify our custom filetype
+const MAGIC_BYTES: [u8; 8] = [0x85, 0x1E, 0x44, 0xB9, 0xA6, 0x58, 0x8F, 0x7F]; // Random bytes chosen to identify our custom filetype
 
 /// Saves a [`MessageMap`] to the I/O object provided.
 ///
@@ -231,14 +231,14 @@ mod fnv_tests {
     fn correct_basic() {
         let mut hash = Fnv1A::new();
         hash.update(0x11);
-        assert_eq!(hash.finish(), 0xaf63_cc4c_8601_d15c);
+        assert_eq!(hash.finish(), 0xAF63_CC4C_8601_D15C);
     }
 
     #[test]
     fn correct_nullbyte() {
         let mut hash = Fnv1A::new();
         hash.update(0);
-        assert_eq!(hash.finish(), 0xaf63_bd4c_8601_b7df);
+        assert_eq!(hash.finish(), 0xAF63_BD4C_8601_B7DF);
     }
 }
 
