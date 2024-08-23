@@ -35,16 +35,6 @@ variables.
 - `MESSAGE_REQUIREMENT`: Message count before the user is granted the role. (default 60)
 - `MESSAGE_COOLDOWN`: Amount of time, in seconds, required between messages for them to be counted. (default 60)
 
-## Persistence configuration
-
-> [!WARNING]
-> ALL DATA IS WIPED ON RESTART UNLESS PERSISTENCE IS EXPLICITLY CONFIGURED!
-
-Persistence supports two environment variables.
-
-- `SAVE_INTERVAL`: Setting this environment variable to any positive integer will cause ephemerole to dump its database
-  every that-many seconds.
-- `SAVE_FILE`: This allows you to customize the path of the loaded and saved `.epd` file.
 
 
 
