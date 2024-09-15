@@ -9,7 +9,8 @@ use std::{
 };
 
 use ahash::AHashMap;
-use tokio::{runtime::Handle, task::JoinSet};
+use tokio::runtime::Handle;
+use tokio_util::task::TaskTracker;
 use twilight_http::{request::AuditLogReason, Client};
 use twilight_model::{
     gateway::{event::Event, payload::incoming::MessageCreate},
@@ -46,7 +47,7 @@ pub fn handle_event(
     event: Event,
     state: &AppState,
     message_map: &mut MessageMap,
-    background_tasks: &mut JoinSet<()>,
+    background_tasks: &mut TaskTracker,
     sender_rt: &Handle,
     shutdown: &AtomicBool,
 ) -> bool {

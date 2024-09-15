@@ -12,6 +12,7 @@ default-run = "ephemerole"
 [dependencies]
 # tokio is maintained by multiple large companies
 tokio = { version = "1", features = ["rt", "macros", "signal"] }
+tokio-util = { version = "0.7", features = ["rt"] }
 # twilight is an open-source project with a long history. https://github.com/twilight-rs/twilight
 twilight-gateway = "0.16.0-rc.1"
 twilight-model = "0.16.0-rc.1"

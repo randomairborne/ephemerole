@@ -9,7 +9,8 @@ use std::{
 };
 
 use ephemerole::{AppState, MessageMap};
-use tokio::{runtime::Builder as RuntimeBuilder, task::JoinSet};
+use tokio::runtime::Builder as RuntimeBuilder;
+use tokio_util::task::TaskTracker;
 use twilight_gateway::{EventTypeFlags, Shard, StreamExt};
 use twilight_http::Client;
 use twilight_model::{
@@ -87,7 +88,7 @@ async fn main() {
 
     // create a set of background tasks to handle new messages, so we don't
     // shut them down uncleanly
-    let mut background_tasks = JoinSet::new();
+    let mut background_tasks = TaskTracker::new();
     // We only care about new messages
     let event_types = EventTypeFlags::MESSAGE_CREATE;
 
@@ -114,8 +115,9 @@ async fn main() {
             break;
         }
     }
+    background_tasks.close();
     // Wait for all background tasks to complete
-    while background_tasks.join_next().await.is_some() {}
+    background_tasks.wait().await;
 }
 
 // This function wraps parse_var_res to give human-readable fatal errors
