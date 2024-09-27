@@ -118,6 +118,7 @@ async fn main() {
     background_tasks.close();
     // Wait for all background tasks to complete
     background_tasks.wait().await;
+    println!("Done, thank you!");
 }
 
 // This function wraps parse_var_res to give human-readable fatal errors
