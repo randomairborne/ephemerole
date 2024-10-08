@@ -1,9 +1,8 @@
 #![warn(clippy::all, clippy::pedantic, clippy::nursery)]
 
-use std::{sync::Arc, time::Instant};
+use std::time::Instant;
 
-use ephemerole::{AppState, MessageMap};
-use twilight_http::Client;
+use ephemerole::{AssignConfig, MessageMap};
 use twilight_model::{
     channel::{message::MessageType, Message},
     gateway::payload::incoming::MessageCreate,
@@ -15,10 +14,8 @@ use twilight_model::{
 fn main() {
     let message_count = 1_000_000_000;
     let started = Instant::now();
-    let state = AppState {
-        guild: Id::new(1),
+    let config = AssignConfig {
         role: Id::new(1),
-        client: Arc::new(Client::builder().build()),
         message_cooldown: 60,
         message_requirement: 60,
     };
@@ -76,7 +73,7 @@ fn main() {
             webhook_id: None,
         };
         let msg = MessageCreate(msg);
-        std::hint::black_box(ephemerole::should_assign_role(&msg, &state, &mut messages));
+        std::hint::black_box(ephemerole::should_assign_role(&msg, config, &mut messages));
     }
     let elapsed = started.elapsed();
     println!(

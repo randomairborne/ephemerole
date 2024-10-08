@@ -8,15 +8,15 @@ use std::{
     },
 };
 
-use ephemerole::{AppState, MessageMap};
+use ephemerole::{AssignConfig, MessageMap};
 use tokio::runtime::Builder as RuntimeBuilder;
 use tokio_util::task::TaskTracker;
 use twilight_gateway::{EventTypeFlags, Shard, StreamExt};
-use twilight_http::Client;
+use twilight_http::{request::AuditLogReason, Client};
 use twilight_model::{
-    gateway::{CloseFrame, Intents, ShardId},
+    gateway::{event::Event, CloseFrame, Intents, ShardId},
     id::{
-        marker::{GuildMarker, RoleMarker},
+        marker::{GuildMarker, RoleMarker, UserMarker},
         Id,
     },
 };
@@ -78,17 +78,15 @@ async fn main() {
 
     // Store the target server and role, plus the map of user messages, and the discord
     // notifier all together
-    let state = AppState {
-        guild,
+    let config = AssignConfig {
         role,
-        client,
         message_cooldown,
         message_requirement,
     };
 
     // create a set of background tasks to handle new messages, so we don't
     // shut them down uncleanly
-    let mut background_tasks = TaskTracker::new();
+    let background_tasks = TaskTracker::new();
     // We only care about new messages
     let event_types = EventTypeFlags::MESSAGE_CREATE;
 
@@ -102,23 +100,47 @@ async fn main() {
                 continue;
             }
         };
-        // Calls the handle_event function in lib.rs
-        if ephemerole::handle_event(
-            event,
-            &state,
-            &mut message_map,
-            &mut background_tasks,
-            &sender_rt_handle,
-            shutdown.as_ref(),
-        ) {
-            // if the event is a close, we can stop listening for new ones
-            break;
+
+        if matches!(event, Event::GatewayClose(_)) {
+            // The bot automatically reconnects to discord when
+            // improperly disconnected, so we check if we meant to shut down
+            // then exit the loop if we did
+            if shutdown.load(Ordering::Acquire) {
+                break;
+            }
+        }
+        // If we should add the role, spawn a background task to add the role
+        if let Event::MessageCreate(mc) = event {
+            if ephemerole::should_assign_role(&mc, config, &mut message_map) {
+                let client = client.clone();
+                background_tasks.spawn_on(
+                    add_role(client, guild, config.role, mc.author.id),
+                    &sender_rt_handle,
+                );
+            }
         }
     }
     background_tasks.close();
     // Wait for all background tasks to complete
     background_tasks.wait().await;
     println!("Done, thank you!");
+}
+
+/// Add a role to a specific user, reporting the error in the console
+async fn add_role(
+    client: Arc<Client>,
+    guild: Id<GuildMarker>,
+    role: Id<RoleMarker>,
+    target: Id<UserMarker>,
+) {
+    // Attempt to add the user's role, reporting the error if we can't
+    if let Err(error) = client
+        .add_guild_member_role(guild, target, role)
+        .reason("User hit required message count")
+        .await
+    {
+        eprintln!("ERROR: could not calculate user's message count: {error:?}");
+    }
 }
 
 // This function wraps parse_var_res to give human-readable fatal errors
