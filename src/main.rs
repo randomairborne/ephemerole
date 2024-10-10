@@ -96,6 +96,10 @@ async fn main() {
         let event = match event {
             Ok(event) => event,
             Err(error) => {
+                if shutdown.load(Ordering::Acquire) {
+                    eprintln!("Got error {error} receiving event, but was shutting down anyway");
+                    break;
+                }
                 eprintln!("ERROR: Failed to receive event: {error:?}");
                 continue;
             }
