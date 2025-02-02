@@ -22,6 +22,7 @@ fn main() {
     let mut messages = MessageMap::new();
     for (seq, i) in (1..100_000).cycle().take(message_count).enumerate() {
         let author = User {
+            avatar_decoration_data: None,
             accent_color: None,
             avatar: None,
             avatar_decoration: None,
@@ -40,7 +41,9 @@ fn main() {
             system: None,
             verified: None,
         };
+        #[allow(deprecated)]
         let msg = Message {
+            poll: None,
             activity: None,
             application: None,
             application_id: None,
@@ -55,6 +58,9 @@ fn main() {
             guild_id: None,
             id: Id::new(1),
             interaction: None,
+            call: None,
+            interaction_metadata: None,
+            message_snapshots: vec![],
             kind: MessageType::Regular,
             member: None,
             mention_channels: vec![],
